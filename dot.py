@@ -4,6 +4,7 @@ import data
 import math
 filename="dot"
 #TEST
+#test
 #dataset
 focus=40
 lamda=0.365
