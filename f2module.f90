@@ -1,13 +1,14 @@
 subroutine arrraw(seedcsv,xs,xe,xm,ys,ye,ym,zs,ze,zm,focus,dupnum,phasereverse,&
         & patternsize,intnum,randomseed,intmax,spd,seedtxt,basetxt,plotcsv)
     implicit none
-    integer :: i,j,k,u,rnum,n2
-    integer :: cut,nextn,n,dx,dy,dz
-    real :: x,y,z,trans,phase,NA,r,wide
+    integer :: i,j,k,rnum,n2
+    integer :: cut,nextn,n,dx,dy,dz,dup_t,dup_arr_t
+    real :: x,y,z,trans,phase,NA,r,wide,t_size
     integer, intent(in) :: xm,ym,zm,phasereverse,randomseed,spd
     real, intent(in) :: xs,xe,ys,ye,zs,ze,focus,dupnum,intnum,patternsize,intmax
     character(*), intent(in) :: seedcsv,seedtxt,plotcsv,basetxt
     real(4), dimension(xm,ym,zm) :: arr 
+    integer(4), dimension(xm,ym) :: dup_arr
     integer :: seedsize
     integer, allocatable:: seed(:)
     character,parameter :: seedfmt*38='(a,2f11.6,2f6.2,f11.6,f9.3,f11.6,f9.5)'
@@ -20,9 +21,10 @@ subroutine arrraw(seedcsv,xs,xe,xm,ys,ye,ym,zs,ze,zm,focus,dupnum,phasereverse,&
     allocate(seed(seedsize))         ! シード格納領域を確保
     seed=randomseed
     call random_seed(put=seed) 
-
+    t_size = real(patternsize / 2)
     open (17, file=seedcsv, status='old') 
     n = 0
+
     read (17, '()')
     do 
         read ( 17, *, end =100)x,y,z,trans,wide
@@ -34,55 +36,62 @@ subroutine arrraw(seedcsv,xs,xe,xm,ys,ye,ym,zs,ze,zm,focus,dupnum,phasereverse,&
 
     do i = 1, n
         read (17, *) x,y,z,trans,wide
-        dx=digtxy(x,xs,xe,xm)
-        dy=digtxy(y,ys,ye,ym)
+        dx=digtxy(x,t_size,xs,xe,xm)
+        dy=digtxy(y,t_size,ys,ye,ym)
         dz=digtz(z,zs,ze,zm)
         arr(dx,dy,dz) = 1
     enddo
     close(17)
-    
-    n2 = 1
-    do i = 1, xm
-        do j = 1, ym
-            u = -1
-            do k  = zm, 1, -1
-                if (arr(i,j,k) /= 0) then
-                        n2 = n2 + 1
-                        if (mod(n2,spd) == 0 )then
-                            u = u +1
-                            x = xs + i*(xe-xs)/(xm-1)
-                            y = ys + j*(ye-ys)/(ym-1)
-                            z = (-1)*ze + (zm-k)*(ze-zs)/(zm-1)
-                            trans = intfct(z,intnum,dupnum,u,intmax)
-                            call random_number(r)
-                            rnum = int(r*100)+1
-                            phase = phasefct(z-focus,rnum,phasereverse)
-                            NA = NAfct(z-focus,xe-xs)
-                            write(16,seedfmt)"rect",x,y,patternsize,patternsize,trans,phase,z,NA
+    n2 = 0
+    dup_arr = 0
+    do k  = zm, 1, -1
+        do i = 1, xm
+            do j = 1, ym
 
-                        print *,n2  
-                        end if
+                if (arr(i,j,k) /= 0) then
+                    dup_t = dup_arr(i,j)
+                    dup_arr(i,j) = dup_t + 1
+                    n2 = n2 + 1
+                    dup_arr_t = dup_arr(i,j)
+                    if (mod(n2,spd) == 0 )then
+                        x = xs + i*(xe-xs)/(xm-1)
+                        y = ys + j*(ye-ys)/(ym-1)
+                        z = (-1)*ze + (zm-k)*(ze-zs)/(zm-1)
+                        trans = intfct(z,intnum,dupnum,dup_arr_t,intmax)
+                        call random_number(r)
+                        rnum = int(r*100)+1
+                        phase = phasefct(z-focus,rnum,phasereverse)
+                        NA = NAfct(z-focus,xe-xs)
+                        write(16,seedfmt)"rect",x,y,patternsize,patternsize,trans,phase,z,NA
+
+                    print *,n2  
+                    end if
                 end if    
             enddo
         enddo
     enddo
     close(16)
 
-    do i = 1, xm
-        do j = 1, ym
-            u = -1
-            do k  = zm, 1, -1
+    call random_seed(put=seed) 
+
+    dup_arr = 0
+    do k  = zm, 1, -1
+        do i = 1, xm
+            do j = 1, ym
+
                 if (arr(i,j,k) /= 0) then
-                        u = u +1
-                        x = xs + i*(xe-xs)/(xm-1)
-                        y = ys + j*(ye-ys)/(ym-1)
-                        z = (-1)*ze + (zm-k)*(ze-zs)/(zm-1)
-                        trans = intfct(z,intnum,dupnum,u,intmax)
-                        call random_number(r)
-                        rnum = int(r*100)+1
-                        phase = phasefct(z-focus,rnum,phasereverse)
-                        NA = NAfct(z-focus,xe-xs)
-                        write(18,seedfmt)"rect",x,y,patternsize,patternsize,trans,phase,z,NA
+                    dup_t = dup_arr(i,j)
+                    dup_arr(i,j) = dup_t + 1
+                    dup_arr_t = dup_arr(i,j)
+                    x = xs + i*(xe-xs)/(xm-1)
+                    y = ys + j*(ye-ys)/(ym-1)
+                    z = (-1)*ze + (zm-k)*(ze-zs)/(zm-1)
+                    trans = intfct(z,intnum,dupnum,dup_arr_t,intmax)
+                    call random_number(r)
+                    rnum = int(r*100)+1
+                    phase = phasefct(z-focus,rnum,phasereverse)
+                    NA = NAfct(z-focus,xe-xs)
+                    write(18,seedfmt)"rect",x,y,patternsize,patternsize,trans,phase,z,NA
                 end if    
             enddo
         enddo
@@ -94,6 +103,7 @@ subroutine arrraw(seedcsv,xs,xe,xm,ys,ye,ym,zs,ze,zm,focus,dupnum,phasereverse,&
 
     open (15, file=seedtxt, status='old') 
     open (14, file=plotcsv, status='replace') 
+    rewind (15)
     n = 0
     do 
         read ( 15, *, end =101)rect,x,y,wide,wide,trans,phase,z,NA
@@ -119,13 +129,13 @@ subroutine arrraw(seedcsv,xs,xe,xm,ys,ye,ym,zs,ze,zm,focus,dupnum,phasereverse,&
 
     contains
 
-    function digtxy(c1,xystart,xyfi, mult) result(digtnum)
+    function digtxy(c1,size,xystart,xyfi, mult) result(digtnum)
         implicit none
         integer :: mult,digtnum
         real :: c1, xystart, xyfi
-        real :: width, c2
+        real :: width, c2, size
         width = real(xyfi - xystart)/real(mult - 1) 
-        c2 = c1 - xystart
+        c2 = c1 + size - xystart
         digtnum = int(c2 / width )+1
         return
     end function digtxy
@@ -189,7 +199,7 @@ subroutine arrraw(seedcsv,xs,xe,xm,ys,ye,ym,zs,ze,zm,focus,dupnum,phasereverse,&
     integer :: n,dx,dy,dz,interx,intery,interz
     integer :: pn,dc1,dc2,dc3
     !integer :: sign
-    real :: x,y,z,wide,trans,phase,NA,r,temp,tempf,temp_phase
+    real :: x,y,z,wide,trans,phase,NA,r,temp,tempf,temp_phase,t_size
     real, intent(in) :: xs,xe,ys,ye,zs,ze,minus_th,plus_th,f_plus,f_minus
     real, intent(in) :: focus,dupnum,patternsize,sp1,sp2,decnum
     real(4), dimension(listlen), intent(out) :: paralist
@@ -227,7 +237,7 @@ subroutine arrraw(seedcsv,xs,xe,xm,ys,ye,ym,zs,ze,zm,focus,dupnum,phasereverse,&
     arrfirst_amp = 0
     arrbefore_phase = 0
 
-
+    t_size = real(patternsize / 2)
     
     !interpolate
     interx=(xi-1)*internum+1
@@ -287,8 +297,8 @@ subroutine arrraw(seedcsv,xs,xe,xm,ys,ye,ym,zs,ze,zm,focus,dupnum,phasereverse,&
     read (18, '()')
     do i = 1, n
         read (18, *)rect,x,y,wide,wide,trans,phase,z,NA
-        dx=digtxy(x,xs,xe,interx)
-        dy=digtxy(y,ys,ye,intery)
+        dx=digtxy(x,t_size,xs,xe,interx)
+        dy=digtxy(y,t_size,ys,ye,intery)
         dz=digtz(z,zs,ze,interz)
         arrfirst(dx,dy,dz) = 1
     enddo
@@ -306,8 +316,8 @@ subroutine arrraw(seedcsv,xs,xe,xm,ys,ye,ym,zs,ze,zm,focus,dupnum,phasereverse,&
     read (19, '()')
     do i = 1, n
         read (19, *)rect,x,y,wide,wide,trans,phase,z,NA
-        dx=digtxy(x,xs,xe,interx)
-        dy=digtxy(y,ys,ye,intery)
+        dx=digtxy(x,t_size,xs,xe,interx)
+        dy=digtxy(y,t_size,ys,ye,intery)
         dz=digtz(z,zs,ze,interz)
         arrbefore(dx,dy,dz) = trans
         arrbefore_phase(dx,dy,dz) = phase
@@ -562,13 +572,13 @@ subroutine arrraw(seedcsv,xs,xe,xm,ys,ye,ym,zs,ze,zm,focus,dupnum,phasereverse,&
         return
     end function NAfct
 
-    function digtxy(c1,xystart,xyfi, mult) result(digtnum)
+    function digtxy(c1,size,xystart,xyfi, mult) result(digtnum)
         implicit none
         integer :: mult,digtnum
         real :: c1, xystart, xyfi
-        real :: width, c2
+        real :: width, c2, size
         width = real(xyfi - xystart)/real(mult - 1) 
-        c2 = c1 - xystart
+        c2 = c1 + size - xystart
         digtnum = int(c2 / width )+1
         return
     end function digtxy
